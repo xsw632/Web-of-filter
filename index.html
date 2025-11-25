@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hasselblad Style Cam</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent: #e3540f;
+            /* 哈苏橙/红 */
+            --text-main: #e0e0e0;
+            --text-dim: #666;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'DIN Alternate', 'Roboto', Helvetica, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* 顶部 LOGO */
+        .header {
+            margin-top: 30px;
+            letter-spacing: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #999;
+        }
+
+        /* 模拟参数刻度 */
+        .dial-container {
+            width: 100%;
+            max-width: 400px;
+            height: 60px;
+            margin: 20px 0;
+            position: relative;
+            overflow: hidden;
+            mask-image: linear-gradient(to right, transparent, black 20%, black 80%, transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, black 20%, black 80%, transparent);
+            border-top: 1px solid #333;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dial-numbers {
+            display: flex;
+            gap: 40px;
+            color: var(--text-dim);
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .dial-center-marker {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 10px;
+            background-color: var(--accent);
+            z-index: 10;
+        }
+
+        .current-setting {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .setting-title {
+            font-size: 12px;
+            letter-spacing: 2px;
+            font-weight: bold;
+        }
+
+        .setting-val {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        /* 取景框 */
+        .viewfinder {
+            width: 90%;
+            max-width: 500px;
+            aspect-ratio: 4/5;
+            /* 或者是 16/9, 这里的 4:5 比较像 ins 风格 */
+            background-color: #000;
+            border: 1px solid #333;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 辅助线 */
+        .grid-line {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .g-v {
+            width: 1px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .g-h {
+            height: 1px;
+            width: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        #preview-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: filter 0.2s;
+            display: none;
+            /* 默认隐藏，上传后显示 */
+        }
+
+        .placeholder-text {
+            color: #444;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        /* 控制区 */
+        .controls {
+            width: 80%;
+            max-width: 400px;
+            margin-top: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 70%;
+            height: 2px;
+            background: #333;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--text-main);
+            cursor: pointer;
+        }
+
+        /* 上传按钮 */
+        .upload-btn-wrapper {
+            margin-top: 30px;
+            margin-bottom: 50px;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: white;
+            padding: 10px 30px;
+            border-radius: 30px;
+            border: none;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(227, 84, 15, 0.3);
+        }
+
+        input[type=file] {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 顶部 Logo -->
+    <div class="header">HASSELBLAD</div>
+
+    <!-- 模拟刻度盘 -->
+    <div class="dial-container">
+        <div class="dial-center-marker"></div>
+        <div class="dial-numbers">
+            <span>15</span><span>30</span><span style="color:white">60</span><span>125</span><span>250</span>
+        </div>
+    </div>
+
+    <div class="current-setting">
+        <div class="setting-title">X-PAN MODE</div>
+        <div class="setting-val">ISO 400</div>
+    </div>
+
+    <!-- 图片预览区域 -->
+    <div class="viewfinder" id="viewfinder">
+        <div class="grid-line g-v"></div>
+        <div class="grid-line g-h"></div>
+        <div class="placeholder-text" id="placeholder">点击下方按钮上传照片</div>
+        <img id="preview-img" alt="Preview">
+    </div>
+
+    <!-- 滤镜控制 -->
+    <div class="controls">
+        <div class="slider-group">
+            <span>曝光</span>
+            <input type="range" id="brightness" min="50" max="150" value="100">
+        </div>
+        <div class="slider-group">
+            <span>对比</span>
+            <input type="range" id="contrast" min="50" max="180" value="110">
+        </div>
+        <div class="slider-group">
+            <span>复古</span>
+            <input type="range" id="sepia" min="0" max="60" value="20">
+        </div>
+        <div class="slider-group">
+            <span>暗角</span>
+            <input type="range" id="vignette" min="0" max="100" value="0">
+        </div>
+    </div>
+
+    <!-- 上传按钮 -->
+    <div class="upload-btn-wrapper">
+        <button class="btn" onclick="document.getElementById('file-upload').click()">Load Image</button>
+        <input type="file" id="file-upload" accept="image/*">
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-upload');
+        const previewImg = document.getElementById('preview-img');
+        const placeholder = document.getElementById('placeholder');
+        const viewfinder = document.getElementById('viewfinder');
+
+        // 滤镜控件
+        const brightnessSlider = document.getElementById('brightness');
+        const contrastSlider = document.getElementById('contrast');
+        const sepiaSlider = document.getElementById('sepia');
+        const vignetteSlider = document.getElementById('vignette');
+
+        // 图片上传逻辑
+        fileInput.addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                previewImg.src = e.target.result;
+                previewImg.style.display = 'block';
+                placeholder.style.display = 'none';
+                applyFilters();
+            }
+            reader.readAsDataURL(file);
+        });
+
+        // 实时滤镜逻辑
+        function applyFilters() {
+            const b = brightnessSlider.value;
+            const c = contrastSlider.value;
+            const s = sepiaSlider.value;
+            const v = vignetteSlider.value; // 暗角是用 box-shadow 模拟的
+
+            // 应用 CSS 滤镜
+            previewImg.style.filter = `brightness(${b}%) contrast(${c}%) sepia(${s}%)`;
+
+            // 模拟暗角 (通过 viewfinder 的内阴影)
+            if (v > 0) {
+                viewfinder.style.boxShadow = `inset 0 0 ${v * 2}px rgba(0,0,0,0.8)`;
+            } else {
+                viewfinder.style.boxShadow = 'none';
+            }
+        }
+
+        [brightnessSlider, contrastSlider, sepiaSlider, vignetteSlider].forEach(slider => {
+            slider.addEventListener('input', applyFilters);
+        });
+    </script>
+</body>
+
+</html>
